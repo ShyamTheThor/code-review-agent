@@ -5,7 +5,8 @@ paste), sends it to the FastAPI backend, and renders the structured
 review. It contains no LLM or business logic.
 
 Phase 2: adds a Review History sidebar backed by the existing
-GET /history and GET /history/{review_id} endpoints.
+GET /history and GET /history/{review_id} endpoints, plus a Memory
+Insights sidebar backed by GET /memory.
 """
 
 import os
@@ -101,6 +102,32 @@ def fetch_review(review_id):
         return resp.json(), None
     except ValueError:
         return None, "Backend returned an invalid response."
+
+
+def fetch_memory():
+    """Fetch memory insights from GET /memory.
+
+    Returns (insights_dict, error_message).
+    """
+    try:
+        resp = requests.get(f"{BACKEND_URL}/memory", timeout=10)
+    except requests.Timeout:
+        return None, "Loading memory insights timed out."
+    except requests.RequestException:
+        return None, "Could not reach the backend to load memory insights."
+
+    if not resp.ok:
+        return None, f"Backend returned HTTP {resp.status_code} for memory."
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, "Backend returned an invalid memory response."
+
+    if not isinstance(data, dict):
+        return None, "Backend returned an invalid memory response."
+
+    return data, None
 
 
 # ---------------------------------------------------------------------------
@@ -213,10 +240,44 @@ def render_history_sidebar() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Sidebar: Memory Insights (aggregate Hindsight Memory view)
+# ---------------------------------------------------------------------------
+def render_memory_sidebar() -> None:
+    """Show aggregate Hindsight Memory insights in the sidebar."""
+    st.sidebar.header("Memory Insights")
+
+    insights, error = fetch_memory()
+
+    if error:
+        st.sidebar.warning(error)
+        return
+
+    total_reviews = insights.get("total_reviews", 0)
+    # Empty history: no reviews means nothing to summarize yet.
+    if not total_reviews:
+        st.sidebar.info("No memory insights yet.")
+        return
+
+    st.sidebar.metric("Total Reviews", total_reviews)
+    st.sidebar.caption(f"**Top Weakness:** {insights.get('top_issue') or 'N/A'}")
+
+    # Recurring issue categories and their counts.
+    patterns = insights.get("patterns", [])
+    if patterns:
+        st.sidebar.markdown("**Recurring issues:**")
+        for pattern in patterns:
+            st.sidebar.markdown(
+                f"- {pattern.get('issue', 'Unknown')} "
+                f"({pattern.get('count', 0)})"
+            )
+
+
+# ---------------------------------------------------------------------------
 # Main page
 # ---------------------------------------------------------------------------
 # Render the sidebar first so history is available regardless of main state.
 render_history_sidebar()
+render_memory_sidebar()
 
 # --- Backend availability check ---
 backend_available = backend_is_up()
@@ -302,4 +363,3 @@ if st.button("Review Code", type="primary", disabled=review_disabled):
         st.stop()
 
     render_results(result)
-

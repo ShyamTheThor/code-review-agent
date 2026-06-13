@@ -10,6 +10,7 @@ from typing import Dict, List
 
 from backend.database import get_all_reviews
 
+
 logger = logging.getLogger(__name__)
 
 # Canonical issue categories and the keywords that map an issue title to
@@ -90,6 +91,45 @@ def analyze_patterns() -> Dict[str, List[Dict[str, object]]]:
     ]
 
     return {"top_patterns": top_patterns}
+
+
+def get_memory_insights() -> Dict[str, object]:
+    """Summarize review history into high-level memory insights.
+
+    Combines recurring pattern analysis with overall counts so callers
+    (e.g. an insights endpoint or dashboard) get a single snapshot.
+
+    Returns:
+        A dict of the form:
+            {
+                "patterns": [{"issue": "Exception Handling", "count": 5}, ...],
+                "total_reviews": 12,
+                "top_issue": "Exception Handling",  # or None when empty
+            }
+    """
+    # Reuse the existing pattern analysis (already handles read failures
+    # and empty history by returning an empty list).
+    patterns = analyze_patterns()["top_patterns"]
+
+    # Reuse the existing storage accessor to count total reviews, guarding
+    # against storage errors the same way analyze_patterns() does.
+    try:
+        reviews = get_all_reviews()
+    except Exception:
+        logger.exception("Failed to read review history for memory insights")
+        reviews = []
+
+    total_reviews = len(reviews)
+
+    # patterns is already sorted by count descending, so the first entry
+    # (if any) is the most frequent issue category.
+    top_issue = patterns[0]["issue"] if patterns else None
+
+    return {
+        "patterns": patterns,
+        "total_reviews": total_reviews,
+        "top_issue": top_issue,
+    }
 
 
 def generate_memory_context() -> str:

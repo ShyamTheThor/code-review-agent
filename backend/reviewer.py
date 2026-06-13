@@ -20,6 +20,10 @@ from backend.config import Settings
 from backend.database import save_review
 from backend.memory import generate_memory_context
 from backend.models import Issue, ReviewResponse, Severity
+from backend.hindsight_memory import (
+    store_review_memory,
+    recall_review_memories,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +81,34 @@ async def review_code(
     memory_context = generate_memory_context()
     logger.info("Memory context injected:\n%s", memory_context)
 
+    try:
+        hindsight_memories = await recall_review_memories(
+        "python code review"
+        )
+        logger.info("Hindsight recall successful: %s", hindsight_memories)
+
+        hindsight_context = ""
+
+        if hindsight_memories and hasattr(hindsight_memories, "results"):
+            memories = []
+
+            for item in hindsight_memories.results[:5]:
+                if hasattr(item, "text"):
+                    memories.append(item.text)
+
+            hindsight_context = "\n".join(memories)
+    except Exception:
+        logger.exception("Hindsight recall failed")
+        hindsight_memories = None
+
     # Inject the historical patterns into the system prompt so the model
     # pays extra attention to the user's recurring weak spots.
     system_content = (
         f"{SYSTEM_PROMPT}\n\n"
         f"Historical review patterns:\n\n"
-        f"{memory_context}"
+        f"{memory_context}\n\n"
+        f"Hindsight memories:\n\n"
+        f"{hindsight_context}"
     )
 
     try:
@@ -157,6 +183,14 @@ async def review_code(
             summary=review.summary,
             issues=issues_payload,
             suggestions=review.suggestions,
+        )
+        await store_review_memory(
+            {
+                "filename": filename,
+                "summary": review.summary,
+                "issues": issues_payload,
+                "suggestions": review.suggestions,
+            }
         )
     except Exception:
         # Log and continue; the API response is unaffected.

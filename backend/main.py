@@ -16,6 +16,7 @@ from groq import AsyncGroq
 from backend.config import get_settings
 from backend.models import ReviewRequest, ReviewResponse
 from backend.reviewer import review_code
+from backend.memory import get_memory_insights
 
 # Configure root logging once for the backend process.
 logging.basicConfig(
@@ -109,3 +110,8 @@ async def history_item(review_id: int) -> dict:
         raise HTTPException(status_code=404, detail="Review not found")
 
     return review
+
+@app.get("/memory")
+def memory_insights():
+    """Return Hindsight Memory insights (recurring patterns, totals, top issue)."""
+    return get_memory_insights()
