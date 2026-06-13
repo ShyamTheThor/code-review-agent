@@ -9,7 +9,7 @@ This module owns the web layer only:
 
 import logging
 from contextlib import asynccontextmanager
-
+from backend.database import get_all_reviews, get_review_by_id
 from fastapi import FastAPI, HTTPException, Request
 from groq import AsyncGroq
 
@@ -75,3 +75,37 @@ async def review(request: ReviewRequest, req: Request) -> ReviewResponse:
     except RuntimeError as exc:
         logger.warning("Review request failed: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+@app.get("/history")
+async def history() -> list:
+    """Return the full review history, newest first.
+
+    Reads all persisted reviews from SQLite. A storage failure is logged
+    and surfaced as a 500 so the client gets a clean error rather than a
+    stack trace.
+    """
+    try:
+        return get_all_reviews()
+    except Exception as exc:
+        logger.exception("Failed to fetch review history")
+        raise HTTPException(
+            status_code=500, detail="Failed to read review history."
+        ) from exc
+
+
+@app.get("/history/{review_id}")
+async def history_item(review_id: int) -> dict:
+    """Return a single review by id, or 404 if it does not exist."""
+    try:
+        review = get_review_by_id(review_id)
+    except Exception as exc:
+        logger.exception("Failed to fetch review id=%s", review_id)
+        raise HTTPException(
+            status_code=500, detail="Failed to read review."
+        ) from exc
+
+    # Distinguish "not found" (404) from a storage error (500).
+    if review is None:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    return review

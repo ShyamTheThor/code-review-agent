@@ -4,6 +4,7 @@ Responsibilities:
   - Build the review prompt.
   - Call Qwen3-32B via the async Groq client.
   - Safely parse and validate the JSON response into Pydantic models.
+  - Persist every successful review (Phase 2: Hindsight Memory).
 
 The Groq client is injected (built once at app startup) rather than
 created here, so this module stays free of lifecycle concerns and is
@@ -16,6 +17,8 @@ import logging
 from groq import AsyncGroq
 
 from backend.config import Settings
+from backend.database import save_review
+from backend.memory import generate_memory_context
 from backend.models import Issue, ReviewResponse, Severity
 
 logger = logging.getLogger(__name__)
@@ -48,14 +51,19 @@ Rules:
 
 
 async def review_code(
-    client: AsyncGroq, settings: Settings, code: str
+    client: AsyncGroq,
+    settings: Settings,
+    code: str,
+    filename: str = "pasted_code.py",
 ) -> ReviewResponse:
-    """Send code to Groq and return a structured, validated review.
+    """Send code to Groq, return a structured review, and persist it.
 
     Args:
         client: A reusable AsyncGroq client (created at app startup).
         settings: Validated application settings (model, timeout, etc.).
         code: The Python source code to review.
+        filename: Name of the reviewed file (defaults to a placeholder for
+            pasted code). Used only for storage.
 
     Returns:
         A ReviewResponse with issues, suggestions, and a summary.
@@ -65,11 +73,23 @@ async def review_code(
                       The real cause is logged; callers surface a generic
                       message to clients.
     """
+    # Build memory context from historical reviews (Phase 2: Hindsight Memory).
+    memory_context = generate_memory_context()
+    logger.info("Memory context injected:\n%s", memory_context)
+
+    # Inject the historical patterns into the system prompt so the model
+    # pays extra attention to the user's recurring weak spots.
+    system_content = (
+        f"{SYSTEM_PROMPT}\n\n"
+        f"Historical review patterns:\n\n"
+        f"{memory_context}"
+    )
+
     try:
         completion = await client.chat.completions.create(
             model=settings.groq_model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system_content},
                 {"role": "user", "content": f"Review this Python code:\n\n{code}"},
             ],
             temperature=0.2,  # Low temperature for consistent, repeatable reviews.
@@ -120,4 +140,26 @@ async def review_code(
 
     summary = str(data.get("summary", "")).strip() or "No summary provided."
 
-    return ReviewResponse(issues=issues, suggestions=suggestions, summary=summary)
+    # --- Build the validated response object ---
+    review = ReviewResponse(issues=issues, suggestions=suggestions, summary=summary)
+
+    # --- Persist the review (Phase 2: Hindsight Memory) ---
+    # Storage is best-effort: a DB failure must never fail the user's review.
+    try:
+        # Convert Pydantic issues into JSON-serializable dicts. Severity is a
+        # str-enum, so issue.severity.value yields a plain string.
+        issues_payload = [
+            {"title": issue.title, "severity": issue.severity.value}
+            for issue in review.issues
+        ]
+        save_review(
+            filename=filename,
+            summary=review.summary,
+            issues=issues_payload,
+            suggestions=review.suggestions,
+        )
+    except Exception:
+        # Log and continue; the API response is unaffected.
+        logger.exception("Failed to persist review; returning result anyway")
+
+    return review
