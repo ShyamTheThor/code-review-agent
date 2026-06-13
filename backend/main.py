@@ -11,6 +11,7 @@ import logging
 from contextlib import asynccontextmanager
 from backend.database import get_all_reviews, get_review_by_id
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from groq import AsyncGroq
 
 from backend.config import get_settings
@@ -51,6 +52,14 @@ app = FastAPI(
     description="Phase 1 MVP: AI-powered Python code review via Groq (Qwen3-32B).",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

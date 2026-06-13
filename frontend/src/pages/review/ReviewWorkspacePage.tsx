@@ -6,7 +6,7 @@ import FileUpload from "@/components/review/FileUpload";
 import ReviewActions from "@/components/review/ReviewActions";
 import ReviewSummary from "@/components/review/ReviewSummary";
 import IssueList from "@/components/review/IssueList";
-import { AlertCircle, ChevronLeft } from "lucide-react";
+import { AlertCircle, ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export default function ReviewWorkspacePage() {
@@ -102,7 +102,13 @@ export default function ReviewWorkspacePage() {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 relative">
+        {loading && (
+          <div className="absolute inset-0 z-10 bg-zinc-950/60 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center gap-4">
+            <Loader2 className="size-10 text-indigo-500 animate-spin" />
+            <p className="text-indigo-400 font-medium">Analyzing your code with AI...</p>
+          </div>
+        )}
         <MonacoCodeEditor 
           value={code} 
           onChange={setCode} 

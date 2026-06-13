@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 reviews.db
 .streamlit/
+.DS_Store

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { AlertTriangle } from "lucide-react";
 
 interface RecurringIssuesProps {
-  weaknesses: string[];
+  weaknesses?: string[];
 }
 
 export default function RecurringIssues({ weaknesses }: RecurringIssuesProps) {
@@ -16,7 +16,7 @@ export default function RecurringIssues({ weaknesses }: RecurringIssuesProps) {
       </CardHeader>
       <CardContent>
         <ul className="space-y-3">
-          {weaknesses.map((weakness, index) => (
+          {weaknesses?.map((weakness, index) => (
             <li key={index} className="flex items-start gap-3 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800">
               <span className="flex-shrink-0 size-6 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center text-xs font-bold">
                 {index + 1}
@@ -24,7 +24,7 @@ export default function RecurringIssues({ weaknesses }: RecurringIssuesProps) {
               <p className="text-sm text-zinc-300 leading-tight pt-0.5">{weakness}</p>
             </li>
           ))}
-          {weaknesses.length === 0 && (
+          {(!weaknesses || weaknesses.length === 0) && (
             <p className="text-sm text-zinc-500 italic py-4 text-center">No recurring weaknesses identified yet.</p>
           )}
         </ul>
@@ -32,3 +32,4 @@ export default function RecurringIssues({ weaknesses }: RecurringIssuesProps) {
     </Card>
   );
 }
+

@@ -8,7 +8,7 @@ interface MemoryHighlightsProps {
 }
 
 export default function MemoryHighlights({ insights }: MemoryHighlightsProps) {
-  const topCategory = insights.frequentIssueCategories[0];
+  const topCategory = insights?.frequentIssueCategories?.[0];
 
   return (
     <DashboardCard title="Memory Highlights" className="h-full">
@@ -20,7 +20,7 @@ export default function MemoryHighlights({ insights }: MemoryHighlightsProps) {
             </div>
             <div>
               <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Top Weakness</p>
-              <p className="text-sm text-zinc-200 font-medium capitalize">{insights.topWeakness}</p>
+              <p className="text-sm text-zinc-200 font-medium capitalize">{insights?.topWeakness || "N/A"}</p>
             </div>
           </div>
 
@@ -30,7 +30,7 @@ export default function MemoryHighlights({ insights }: MemoryHighlightsProps) {
             </div>
             <div>
               <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Improvement Trend</p>
-              <p className="text-sm text-zinc-200 font-medium">Score: {insights.improvementTrendScore}%</p>
+              <p className="text-sm text-zinc-200 font-medium">Score: {insights?.improvementTrendScore ?? 0}%</p>
             </div>
           </div>
 

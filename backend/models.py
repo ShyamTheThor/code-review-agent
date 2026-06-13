@@ -43,7 +43,11 @@ class ReviewRequest(BaseModel):
 
 class Issue(BaseModel):
     """A single issue found during review."""
-    title: str = Field(..., description="Short description of the issue.")
+    id: str = Field(..., description="Unique identifier for the issue.")
+    type: str = Field(..., description="Category of the issue (security, performance, etc.).")
+    line: int = Field(..., description="Line number of the issue.")
+    message: str = Field(..., description="Detailed description of the issue.")
+    suggestion: str = Field(..., description="Concrete improvement action.")
     severity: Severity = Field(..., description="Severity level of the issue.")
 
 

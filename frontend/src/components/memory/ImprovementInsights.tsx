@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { IssueCategory } from "@/types/memory.types";
 
 interface ImprovementInsightsProps {
-  categories: IssueCategory[];
+  categories?: IssueCategory[];
 }
 
 export default function ImprovementInsights({ categories }: ImprovementInsightsProps) {
@@ -30,7 +30,7 @@ export default function ImprovementInsights({ categories }: ImprovementInsightsP
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {categories.map((cat) => (
+          {categories?.map((cat) => (
             <div key={cat.category} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/30 border border-zinc-800">
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-zinc-200 capitalize">{cat.category}</span>
@@ -47,7 +47,7 @@ export default function ImprovementInsights({ categories }: ImprovementInsightsP
               </div>
             </div>
           ))}
-          {categories.length === 0 && (
+          {(!categories || categories.length === 0) && (
             <p className="text-sm text-zinc-500 italic py-4 text-center">No trend data available.</p>
           )}
         </div>

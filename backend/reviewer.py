@@ -13,6 +13,7 @@ easy to test.
 
 import json
 import logging
+import uuid
 
 from groq import AsyncGroq
 
@@ -28,8 +29,7 @@ from backend.hindsight_memory import (
 logger = logging.getLogger(__name__)
 
 # Strong, explicit system prompt. We constrain the model to emit ONLY a
-# JSON object matching our schema so parsing is deterministic. Examples
-# of valid severities are listed to reduce out-of-vocabulary values.
+# JSON object matching our schema so parsing is deterministic.
 SYSTEM_PROMPT = """You are an expert Python code reviewer with deep knowledge of
 PEP 8, type safety, security, performance, readability, and maintainability.
 
@@ -41,15 +41,23 @@ For each issue, assign a severity:
 
 Respond with ONLY a valid JSON object in EXACTLY this schema:
 {
-  "issues": [{"title": "string", "severity": "Low" | "Medium" | "High"}],
+  "issues": [{
+    "type": "security" | "performance" | "style" | "logic",
+    "line": integer,
+    "message": "string",
+    "suggestion": "string",
+    "severity": "Low" | "Medium" | "High"
+  }],
   "suggestions": ["string"],
   "summary": "string"
 }
 
 Rules:
   - Output JSON only. No markdown fences, no commentary, no text before or after.
-  - "title" is a short, specific description of the issue.
-  - "suggestions" are concrete improvement actions.
+  - "type" must be one of: security, performance, style, logic.
+  - "line" is the integer line number where the issue occurs.
+  - "message" is a detailed description.
+  - "suggestion" is a concrete improvement action.
   - "summary" is a brief overall assessment (1-3 sentences).
   - If the code has no issues, return an empty "issues" list and say so in the summary."""
 
@@ -60,31 +68,13 @@ async def review_code(
     code: str,
     filename: str = "pasted_code.py",
 ) -> ReviewResponse:
-    """Send code to Groq, return a structured review, and persist it.
-
-    Args:
-        client: A reusable AsyncGroq client (created at app startup).
-        settings: Validated application settings (model, timeout, etc.).
-        code: The Python source code to review.
-        filename: Name of the reviewed file (defaults to a placeholder for
-            pasted code). Used only for storage.
-
-    Returns:
-        A ReviewResponse with issues, suggestions, and a summary.
-
-    Raises:
-        RuntimeError: if the LLM call fails or returns unusable output.
-                      The real cause is logged; callers surface a generic
-                      message to clients.
-    """
+    """Send code to Groq, return a structured review, and persist it."""
     # Build memory context from historical reviews (Phase 2: Hindsight Memory).
     memory_context = generate_memory_context()
     logger.info("Memory context injected:\n%s", memory_context)
 
     try:
-        hindsight_memories = await recall_review_memories(
-        "python code review"
-        )
+        hindsight_memories = await recall_review_memories("python code review")
         logger.info("Hindsight recall successful: %s", hindsight_memories)
 
         hindsight_context = ""
@@ -148,11 +138,16 @@ async def review_code(
     # --- Build issues defensively: one bad entry must not break the batch ---
     issues = []
     for item in data.get("issues", []):
-        if not isinstance(item, dict) or "title" not in item:
+        if not isinstance(item, dict) or "message" not in item:
             continue  # Skip malformed entries silently.
+        
         issues.append(
             Issue(
-                title=str(item["title"]),
+                id=str(uuid.uuid4()),
+                type=str(item.get("type", "style")),
+                line=int(item.get("line", 0)),
+                message=str(item["message"]),
+                suggestion=str(item.get("suggestion", "No suggestion provided.")),
                 severity=Severity.normalize(item.get("severity", "Low")),
             )
         )
@@ -175,7 +170,14 @@ async def review_code(
         # Convert Pydantic issues into JSON-serializable dicts. Severity is a
         # str-enum, so issue.severity.value yields a plain string.
         issues_payload = [
-            {"title": issue.title, "severity": issue.severity.value}
+            {
+                "id": issue.id,
+                "type": issue.type,
+                "line": issue.line,
+                "message": issue.message,
+                "suggestion": issue.suggestion,
+                "severity": issue.severity.value
+            }
             for issue in review.issues
         ]
         save_review(

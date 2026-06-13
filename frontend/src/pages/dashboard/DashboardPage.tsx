@@ -69,10 +69,10 @@ export default function DashboardPage() {
             </div>
           ) : (
             <OverviewCards 
-              totalReviews={history.length}
+              totalReviews={history?.length || 0}
               topWeakness={memory?.topWeakness || "N/A"}
-              recurringCount={memory?.recurringWeaknesses.length || 0}
-              latestDate={history[0]?.createdAt || null}
+              recurringCount={memory?.recurringWeaknesses?.length || 0}
+              latestDate={history && history.length > 0 ? history[0]?.createdAt || null : null}
             />
           )}
         </section>

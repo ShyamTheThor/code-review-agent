@@ -100,19 +100,10 @@ def get_memory_insights() -> Dict[str, object]:
     (e.g. an insights endpoint or dashboard) get a single snapshot.
 
     Returns:
-        A dict of the form:
-            {
-                "patterns": [{"issue": "Exception Handling", "count": 5}, ...],
-                "total_reviews": 12,
-                "top_issue": "Exception Handling",  # or None when empty
-            }
+        A dict matching frontend MemoryInsights interface.
     """
-    # Reuse the existing pattern analysis (already handles read failures
-    # and empty history by returning an empty list).
     patterns = analyze_patterns()["top_patterns"]
 
-    # Reuse the existing storage accessor to count total reviews, guarding
-    # against storage errors the same way analyze_patterns() does.
     try:
         reviews = get_all_reviews()
     except Exception:
@@ -120,15 +111,27 @@ def get_memory_insights() -> Dict[str, object]:
         reviews = []
 
     total_reviews = len(reviews)
+    
+    # Map patterns to frontend's expected format
+    frequent_issue_categories = [
+        {
+            "category": p["issue"],
+            "count": p["count"],
+            "trend": "stable" # Stub
+        }
+        for p in patterns
+    ]
 
-    # patterns is already sorted by count descending, so the first entry
-    # (if any) is the most frequent issue category.
-    top_issue = patterns[0]["issue"] if patterns else None
+    top_weakness = patterns[0]["issue"] if patterns else "N/A"
+    
+    recurring_weaknesses = [p["issue"] for p in patterns[:3]] # Top 3
 
     return {
-        "patterns": patterns,
-        "total_reviews": total_reviews,
-        "top_issue": top_issue,
+        "recurringWeaknesses": recurring_weaknesses,
+        "topWeakness": top_weakness,
+        "frequentIssueCategories": frequent_issue_categories,
+        "improvementTrendScore": 0, # Stub
+        "totalReviewsAnalyzed": total_reviews,
     }
 
 
