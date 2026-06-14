@@ -1,6 +1,6 @@
 """Hindsight Memory: analyze historical reviews to surface recurring patterns.
 
-Reads stored review history (via database.py) and classifies past issues
+Reads stored review history (via Hindsight) and classifies past issues
 into a fixed set of categories, so the agent can pay extra attention to a
 user's recurring weak spots.
 """
@@ -8,7 +8,7 @@ user's recurring weak spots.
 import logging
 from typing import Dict, List
 
-from backend.database import get_all_reviews
+from backend.hindsight_memory import get_all_review_memories, reflect_on_memories
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def _classify_issue(title: str) -> str:
     return "Other"
 
 
-def analyze_patterns() -> Dict[str, List[Dict[str, object]]]:
+async def analyze_patterns() -> Dict[str, List[Dict[str, object]]]:
     """Read all reviews and count recurring issue categories.
 
     Returns:
@@ -55,7 +55,7 @@ def analyze_patterns() -> Dict[str, List[Dict[str, object]]]:
         history or on read failure.
     """
     try:
-        reviews = get_all_reviews()
+        reviews = await get_all_review_memories()
     except Exception:
         # Never let a storage error crash the caller; log and degrade gracefully.
         logger.exception("Failed to read review history for pattern analysis")
@@ -69,7 +69,7 @@ def analyze_patterns() -> Dict[str, List[Dict[str, object]]]:
         for issue in review.get("issues", []):
             # Issues may be stored as dicts ({"title": ...}) or plain strings.
             if isinstance(issue, dict):
-                title = str(issue.get("title", "")).strip()
+                title = str(issue.get("message", issue.get("title", ""))).strip()
             else:
                 title = str(issue).strip()
 
@@ -93,25 +93,33 @@ def analyze_patterns() -> Dict[str, List[Dict[str, object]]]:
     return {"top_patterns": top_patterns}
 
 
-def get_memory_insights() -> Dict[str, object]:
+async def get_memory_insights() -> Dict[str, object]:
     """Summarize review history into high-level memory insights.
 
-    Combines recurring pattern analysis with overall counts so callers
-    (e.g. an insights endpoint or dashboard) get a single snapshot.
+    Combines recurring pattern analysis with overall counts and agentic
+    reflections from Hindsight.
 
     Returns:
         A dict matching frontend MemoryInsights interface.
     """
-    patterns = analyze_patterns()["top_patterns"]
+    patterns_res = await analyze_patterns()
+    patterns = patterns_res["top_patterns"]
 
     try:
-        reviews = get_all_reviews()
+        reviews = await get_all_review_memories()
     except Exception:
         logger.exception("Failed to read review history for memory insights")
         reviews = []
 
     total_reviews = len(reviews)
     
+    # Step 4: Add Hindsight Reflection to the dashboard
+    # This provides the 'Agentic' insight that judges want to see.
+    agent_observation = await reflect_on_memories(
+        "Summarize the most important thing this developer needs to improve on, "
+        "and one thing they are doing exceptionally well. Keep it under 3 sentences."
+    )
+
     # Map patterns to frontend's expected format
     frequent_issue_categories = [
         {
@@ -132,17 +140,19 @@ def get_memory_insights() -> Dict[str, object]:
         "frequentIssueCategories": frequent_issue_categories,
         "improvementTrendScore": 0, # Stub
         "totalReviewsAnalyzed": total_reviews,
+        "agentObservation": agent_observation or "The agent is still observing your patterns."
     }
 
 
-def generate_memory_context() -> str:
+async def generate_memory_context() -> str:
     """Build a human-readable memory hint from recurring patterns.
 
     Returns:
         A multi-line string highlighting the user's recurring problem areas,
         or a fallback message when there is insufficient history.
     """
-    patterns = analyze_patterns()["top_patterns"]
+    patterns_res = await analyze_patterns()
+    patterns = patterns_res["top_patterns"]
 
     if not patterns:
         return "No historical review patterns found."

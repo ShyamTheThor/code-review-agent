@@ -10,4 +10,5 @@ export interface MemoryInsights {
   frequentIssueCategories: IssueCategory[];
   improvementTrendScore: number; // 0-100
   totalReviewsAnalyzed: number;
+  agentObservation: string;
 }

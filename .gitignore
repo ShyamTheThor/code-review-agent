@@ -5,3 +5,4 @@ __pycache__/
 reviews.db
 .streamlit/
 .DS_Store
+*.pdf

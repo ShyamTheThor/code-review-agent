@@ -17,6 +17,18 @@ const MonacoCodeEditor = memo(({ value, onChange, language, disabled }: MonacoCo
     onChange(newValue || "");
   };
 
+  // Disable validation/markers that might show false positives for correct code
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
+  };
+
   return (
     <div className="relative w-full min-h-[500px] rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden group focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/50 transition-all">
       <Editor
@@ -25,6 +37,7 @@ const MonacoCodeEditor = memo(({ value, onChange, language, disabled }: MonacoCo
         value={value}
         theme="vs-dark"
         onChange={handleEditorChange}
+        onMount={handleEditorDidMount}
         loading={<Skeleton className="w-full h-full" />}
         options={{
           readOnly: disabled,
@@ -49,6 +62,8 @@ const MonacoCodeEditor = memo(({ value, onChange, language, disabled }: MonacoCo
           smoothScrolling: true,
           contextmenu: true,
           quickSuggestions: !disabled,
+          // Hide validation decorations if they still appear
+          renderValidationDecorations: "on", 
         }}
       />
     </div>

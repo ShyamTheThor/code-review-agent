@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 
 export default function ReviewWorkspacePage() {
   const [code, setCode] = useState("");
-  const [language, setLanguage] = useState("typescript");
+  const [language, setLanguage] = useState("python");
   const { loading, error, result, submitReview, resetReview } = useReview();
 
   const handleReview = () => {

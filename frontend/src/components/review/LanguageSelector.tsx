@@ -5,6 +5,8 @@ const languages = [
   { label: "Go", value: "go" },
   { label: "Rust", value: "rust" },
   { label: "Java", value: "java" },
+  { label: "C++", value: "cpp" },
+  { label: "C", value: "c" },
 ];
 
 interface LanguageSelectorProps {

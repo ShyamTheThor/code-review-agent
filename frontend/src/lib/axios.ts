@@ -3,7 +3,7 @@ import { env } from "@/config/env";
 
 const apiClient = axios.create({
   baseURL: env.API_BASE_URL,
-  timeout: 15000,
+  timeout: 60000, // Increased to 60s for high-latency AI operations
   headers: {
     "Content-Type": "application/json",
   },

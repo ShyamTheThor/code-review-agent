@@ -30,14 +30,18 @@ class Severity(str, Enum):
 
 
 class ReviewRequest(BaseModel):
-    """Incoming request body: the Python code to review."""
+    """Incoming request body: the code to review."""
     # max_length mirrors the backend's input cap so oversized input gets a
     # clean 422 validation error instead of an expensive LLM call.
     code: str = Field(
         ...,
         min_length=1,
         max_length=50_000,
-        description="Python source code to review.",
+        description="Source code to review.",
+    )
+    language: str = Field(
+        default="python",
+        description="Programming language of the code.",
     )
 
 

@@ -9,7 +9,6 @@ This module owns the web layer only:
 
 import logging
 from contextlib import asynccontextmanager
-from backend.database import get_all_reviews, get_review_by_id
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from groq import AsyncGroq
@@ -18,6 +17,11 @@ from backend.config import get_settings
 from backend.models import ReviewRequest, ReviewResponse
 from backend.reviewer import review_code
 from backend.memory import get_memory_insights
+from backend.hindsight_memory import (
+    close_hindsight_client, 
+    get_all_review_memories, 
+    get_review_memory_by_id
+)
 
 # Configure root logging once for the backend process.
 logging.basicConfig(
@@ -44,7 +48,8 @@ async def lifespan(app: FastAPI):
 
     # Graceful shutdown: release the HTTP connection pool.
     await app.state.groq_client.close()
-    logger.info("Backend shut down. Groq client closed.")
+    await close_hindsight_client()
+    logger.info("Backend shut down. All clients closed.")
 
 
 app = FastAPI(
@@ -71,7 +76,7 @@ async def health() -> dict:
 
 @app.post("/review", response_model=ReviewResponse)
 async def review(request: ReviewRequest, req: Request) -> ReviewResponse:
-    """Accept Python code and return a structured LLM review.
+    """Accept code and return a structured LLM review.
 
     Input is validated by ReviewRequest (size limits included). Internal
     failures are logged in the reviewer and surfaced here as HTTP 502 so
@@ -81,7 +86,7 @@ async def review(request: ReviewRequest, req: Request) -> ReviewResponse:
     client = req.app.state.groq_client
 
     try:
-        return await review_code(client, settings, request.code)
+        return await review_code(client, settings, request.code, language=request.language)
     except RuntimeError as exc:
         logger.warning("Review request failed: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -90,12 +95,10 @@ async def review(request: ReviewRequest, req: Request) -> ReviewResponse:
 async def history() -> list:
     """Return the full review history, newest first.
 
-    Reads all persisted reviews from SQLite. A storage failure is logged
-    and surfaced as a 500 so the client gets a clean error rather than a
-    stack trace.
+    Reads all persisted reviews from Hindsight.
     """
     try:
-        return get_all_reviews()
+        return await get_all_review_memories()
     except Exception as exc:
         logger.exception("Failed to fetch review history")
         raise HTTPException(
@@ -104,10 +107,10 @@ async def history() -> list:
 
 
 @app.get("/history/{review_id}")
-async def history_item(review_id: int) -> dict:
+async def history_item(review_id: str) -> dict:
     """Return a single review by id, or 404 if it does not exist."""
     try:
-        review = get_review_by_id(review_id)
+        review = await get_review_memory_by_id(review_id)
     except Exception as exc:
         logger.exception("Failed to fetch review id=%s", review_id)
         raise HTTPException(
@@ -121,6 +124,6 @@ async def history_item(review_id: int) -> dict:
     return review
 
 @app.get("/memory")
-def memory_insights():
+async def memory_insights():
     """Return Hindsight Memory insights (recurring patterns, totals, top issue)."""
-    return get_memory_insights()
+    return await get_memory_insights()

@@ -18,39 +18,39 @@ import uuid
 from groq import AsyncGroq
 
 from backend.config import Settings
-from backend.database import save_review
 from backend.memory import generate_memory_context
 from backend.models import Issue, ReviewResponse, Severity
 from backend.hindsight_memory import (
     store_review_memory,
     recall_review_memories,
+    reflect_on_memories,
 )
 
 logger = logging.getLogger(__name__)
 
 # Strong, explicit system prompt. We constrain the model to emit ONLY a
 # JSON object matching our schema so parsing is deterministic.
-SYSTEM_PROMPT = """You are an expert Python code reviewer with deep knowledge of
-PEP 8, type safety, security, performance, readability, and maintainability.
+SYSTEM_PROMPT = """You are an expert {language} code reviewer with deep knowledge of
+{conventions}, type safety, security, performance, readability, and maintainability.
 
-Review the provided Python code and identify concrete, actionable issues.
+Review the provided {language} code and identify concrete, actionable issues.
 For each issue, assign a severity:
   - "High": bugs, security flaws, or anything that breaks correctness.
   - "Medium": maintainability or design problems that should be fixed soon.
   - "Low": style, naming, documentation, or minor improvements.
 
 Respond with ONLY a valid JSON object in EXACTLY this schema:
-{
-  "issues": [{
+{{
+  "issues": [{{
     "type": "security" | "performance" | "style" | "logic",
     "line": integer,
     "message": "string",
     "suggestion": "string",
     "severity": "Low" | "Medium" | "High"
-  }],
+  }}],
   "suggestions": ["string"],
   "summary": "string"
-}
+}}
 
 Rules:
   - Output JSON only. No markdown fences, no commentary, no text before or after.
@@ -62,19 +62,91 @@ Rules:
   - If the code has no issues, return an empty "issues" list and say so in the summary."""
 
 
+import re
+
+# ... existing code ...
+
+def _extract_context_keywords(code: str) -> str:
+    """Extract key libraries and patterns from code to drive dynamic recall.
+    
+    This helps the agent find memories relevant to specific frameworks (e.g. FastAPI)
+    rather than just generic 'python' memories.
+    """
+    keywords = ["code review"] # Base query
+    
+    # Common library/framework detection
+    patterns = {
+        "FastAPI/API": r"from fastapi|import fastapi|@app\.",
+        "Database/SQL": r"sqlalchemy|SQLAlchemy|sqlite|postgres|session\.query",
+        "AsyncIO": r"async def|await |import asyncio",
+        "Pydantic": r"from pydantic|BaseModel",
+        "Security": r"password|secret|token|apikey|os\.environ",
+        "Threading": r"threading|multiprocessing|concurrent\.futures",
+        "C++ Standard": r"#include <iostream>|std::",
+        "C Standard": r"#include <stdio.h>|malloc\(",
+    }
+    
+    for label, pattern in patterns.items():
+        if re.search(pattern, code):
+            keywords.append(label)
+            
+    # Also extract specific library imports (e.g. 'import pandas' -> 'pandas')
+    imports = re.findall(r"^(?:import|from|#include <) (\w+)", code, re.MULTILINE)
+    keywords.extend(imports[:3]) # Limit to top 3 unique imports
+    
+    return " ".join(list(dict.fromkeys(keywords))) # Unique keywords only
+
+
+# ... existing code ...
+
+def _generate_disposition(mental_model: str) -> str:
+    """Determine the agent's 'personality' based on the developer's history.
+    
+    This is Step 3: Disposition-Aware Reasoning.
+    """
+    model_lower = mental_model.lower()
+    
+    # Logic to determine tone
+    if "recurring" in model_lower or "persistent" in model_lower:
+        return (
+            "DISPOSITION: STERN MENTOR. The developer is repeating mistakes. "
+            "Be very firm about recurring issues. Do not sugarcoat suggestions for "
+            "problems they have seen before."
+        )
+    elif "senior" in model_lower or "expert" in model_lower or "strong" in model_lower:
+        return (
+            "DISPOSITION: PEER REVIEWER. The developer is experienced. "
+            "Be concise, technical, and direct. Skip the basics; focus on deep "
+            "architectural or performance optimizations."
+        )
+    elif "junior" in model_lower or "struggles" in model_lower:
+        return (
+            "DISPOSITION: PATIENT COACH. The developer is learning. "
+            "Be encouraging and provide educational context in your suggestions. "
+            "Explain the 'why' behind every fix."
+        )
+    
+    return "DISPOSITION: PROFESSIONAL ANALYST. Maintain a balanced, objective tone."
+
+
 async def review_code(
     client: AsyncGroq,
     settings: Settings,
     code: str,
     filename: str = "pasted_code.py",
+    language: str = "python",
 ) -> ReviewResponse:
     """Send code to Groq, return a structured review, and persist it."""
     # Build memory context from historical reviews (Phase 2: Hindsight Memory).
-    memory_context = generate_memory_context()
+    memory_context = await generate_memory_context()
     logger.info("Memory context injected:\n%s", memory_context)
 
     try:
-        hindsight_memories = await recall_review_memories("python code review")
+        # Step 1: Dynamic Context-Aware Recall
+        recall_query = f"{language} " + _extract_context_keywords(code)
+        logger.info("Recall query generated: %s", recall_query)
+        
+        hindsight_memories = await recall_review_memories(recall_query)
         logger.info("Hindsight recall successful: %s", hindsight_memories)
 
         hindsight_context = ""
@@ -87,26 +159,51 @@ async def review_code(
                     memories.append(item.text)
 
             hindsight_context = "\n".join(memories)
-    except Exception:
-        logger.exception("Hindsight recall failed")
-        hindsight_memories = None
+            
+        # Step 2: The Reflection Cycle (Mental Models)
+        developer_mental_model = await reflect_on_memories(
+            "Summarize this developer's recurring technical strengths and persistent "
+            "weaknesses based on their past code reviews. Be concise and actionable."
+        )
+        if developer_mental_model:
+            logger.info("Developer mental model generated: %s", developer_mental_model)
+        else:
+            developer_mental_model = "No consolidated mental model yet."
 
-    # Inject the historical patterns into the system prompt so the model
-    # pays extra attention to the user's recurring weak spots.
+        # Step 3: Disposition-Aware Reasoning
+        disposition = _generate_disposition(developer_mental_model)
+        logger.info("Disposition selected: %s", disposition)
+
+    except Exception:
+        logger.exception("Hindsight memory operations failed")
+        hindsight_memories = None
+        developer_mental_model = "Memory unavailable."
+        disposition = "DISPOSITION: DEFAULT."
+
+    # Language-specific conventions
+    conventions = "PEP 8"
+    if language.lower() in ["c", "cpp"]:
+        conventions = "C/C++ core guidelines, memory safety, and performance"
+    elif language.lower() in ["javascript", "typescript"]:
+        conventions = "modern ECMAScript standards and clean code principles"
+
+    # Inject the historical patterns and disposition into the system prompt.
     system_content = (
-        f"{SYSTEM_PROMPT}\n\n"
-        f"Historical review patterns:\n\n"
-        f"{memory_context}\n\n"
-        f"Hindsight memories:\n\n"
+        f"{SYSTEM_PROMPT.format(language=language, conventions=conventions)}\n\n"
+        f"CURRENT PERSONA:\n{disposition}\n\n"
+        f"Developer Mental Model (Learned Observations):\n"
+        f"{developer_mental_model}\n\n"
+        f"Specific Historical Memories:\n"
         f"{hindsight_context}"
     )
+# ... rest of function ...
 
     try:
         completion = await client.chat.completions.create(
             model=settings.groq_model,
             messages=[
                 {"role": "system", "content": system_content},
-                {"role": "user", "content": f"Review this Python code:\n\n{code}"},
+                {"role": "user", "content": f"Review this {language} code:\n\n{code}"},
             ],
             temperature=0.2,  # Low temperature for consistent, repeatable reviews.
             response_format={"type": "json_object"},  # Force JSON output.
@@ -165,7 +262,7 @@ async def review_code(
     review = ReviewResponse(issues=issues, suggestions=suggestions, summary=summary)
 
     # --- Persist the review (Phase 2: Hindsight Memory) ---
-    # Storage is best-effort: a DB failure must never fail the user's review.
+    # Storage is best-effort: a Hindsight failure must never fail the user's review.
     try:
         # Convert Pydantic issues into JSON-serializable dicts. Severity is a
         # str-enum, so issue.severity.value yields a plain string.
@@ -180,15 +277,11 @@ async def review_code(
             }
             for issue in review.issues
         ]
-        save_review(
-            filename=filename,
-            summary=review.summary,
-            issues=issues_payload,
-            suggestions=review.suggestions,
-        )
+        
         await store_review_memory(
             {
                 "filename": filename,
+                "language": language,
                 "summary": review.summary,
                 "issues": issues_payload,
                 "suggestions": review.suggestions,
