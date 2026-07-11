@@ -1,11 +1,12 @@
-import type { ReviewResponse } from "./review.types";
+import type { ReviewResponse, ReviewIssue } from "./review.types";
 
 export interface HistoryItem {
   id: string;
   summary: string;
-  score: number;
-  language: string;
-  createdAt: string;
+  timestamp: string;
+  filename: string;
+  issues: ReviewIssue[];
+  suggestions: string[];
 }
 
 export type HistoryListResponse = HistoryItem[];

@@ -191,7 +191,7 @@ async def get_all_review_memories() -> List[Dict[str, Any]]:
             logger.error(f"Failed to parse agentic history JSON: {result_text[:200]}")
             
         # Fallback: use recall to get some fragments
-        res = await client.arecall(bank_id=HINDSIGHT_BANK_ID, query="code review", limit=20)
+        res = await client.arecall(bank_id=HINDSIGHT_BANK_ID, query="code review")
         reviews = []
         if hasattr(res, "results"):
             for item in res.results:

@@ -8,17 +8,11 @@ interface HistoryCardProps {
 }
 
 export default function HistoryCard({ item }: HistoryCardProps) {
-  const date = new Date(item.createdAt).toLocaleDateString(undefined, {
+  const date = new Date(item.timestamp).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
   });
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-emerald-500";
-    if (score >= 60) return "text-amber-500";
-    return "text-red-500";
-  };
 
   return (
     <Link to={`/history/${item.id}`}>
@@ -35,7 +29,7 @@ export default function HistoryCard({ item }: HistoryCardProps) {
                 </h3>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="flex items-center gap-1 text-xs text-zinc-500 uppercase tracking-wider font-medium">
-                    {item.language}
+                    {item.filename}
                   </span>
                   <span className="text-zinc-800 text-[10px]">•</span>
                   <div className="flex items-center gap-1.5 text-xs text-zinc-500">
@@ -46,15 +40,7 @@ export default function HistoryCard({ item }: HistoryCardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-6 shrink-0">
-              <div className="text-right">
-                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-0.5">Score</p>
-                <p className={`text-xl font-bold ${getScoreColor(item.score)}`}>
-                  {item.score}
-                </p>
-              </div>
-              <ChevronRight className="size-5 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
-            </div>
+            <ChevronRight className="size-5 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
           </div>
         </CardContent>
       </Card>

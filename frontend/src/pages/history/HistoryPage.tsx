@@ -10,7 +10,7 @@ export default function HistoryPage() {
 
   const filteredItems = items.filter(item => 
     item.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.language.toLowerCase().includes(searchTerm.toLowerCase())
+    item.filename.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
