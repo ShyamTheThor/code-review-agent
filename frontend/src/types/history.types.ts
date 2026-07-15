@@ -7,6 +7,9 @@ export interface HistoryItem {
   filename: string;
   issues: ReviewIssue[];
   suggestions: string[];
+  language?: string;
+  createdAt?: string;
+  score?: number;
 }
 
 export type HistoryListResponse = HistoryItem[];

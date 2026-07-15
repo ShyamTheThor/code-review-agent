@@ -18,7 +18,7 @@ const MonacoCodeEditor = memo(({ value, onChange, language, disabled }: MonacoCo
   };
 
   // Disable validation/markers that might show false positives for correct code
-  const handleEditorDidMount = (editor: any, monaco: any) => {
+  const handleEditorDidMount = (_editor: any, monaco: any) => {
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: true,
       noSyntaxValidation: true,
