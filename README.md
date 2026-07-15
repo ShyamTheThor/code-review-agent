@@ -57,36 +57,3 @@ npm install
 npm run dev
 ```
 
-## Deployment
-
-This project is configured to be deployed as two separate services: a Dockerized FastAPI backend and a static React frontend.
-
-### 1. Deploying the Backend (Render)
-The backend is ready to be deployed to [Render](https://render.com) using the included `Dockerfile` (or `Procfile`).
-
-1. Go to Render and create a new **Web Service**.
-2. Connect your GitHub repository.
-3. Leave the **Root Directory** empty (Render will automatically detect the configuration in the root).
-4. Add the following Environment Variables:
-   * `GROQ_API_KEY`
-   * `HINDSIGHT_API_KEY`
-   * `HINDSIGHT_BANK_ID`
-5. Click **Deploy**. Render will build the environment and give you a live URL (e.g., `https://your-backend.onrender.com`).
-
-### 2. Deploying the Frontend (Vercel)
-The frontend is a Vite/React application, perfect for free hosting on [Vercel](https://vercel.com).
-
-1. Go to Vercel and create a new **Project**.
-2. Connect the same GitHub repository.
-3. **CRITICAL:** Set the **Root Directory** to `frontend`.
-4. Add the following Environment Variable:
-   * `VITE_API_BASE_URL` = `https://your-backend.onrender.com` (Your Render URL)
-5. Click **Deploy**. Vercel will build the frontend and provide your live application URL.
-
-## How It Solves the Hackathon Challenge
-This project demonstrates that memory is not just a database—it is a reasoning layer.
-1.  **Before Memory:** The agent was generic and provided the same feedback for everyone.
-2.  **With Hindsight:** The agent identifies if you are an expert or a junior, remembers your "stubborn" habits (like missing `try-except` blocks), and proactively adjusts its review style to force you to improve.
-
----
-*Built for the Hindsight Hackathon.*
