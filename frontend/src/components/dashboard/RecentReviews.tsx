@@ -23,21 +23,21 @@ export default function RecentReviews({ reviews }: RecentReviewsProps) {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-zinc-200 truncate">{review.summary}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{review.language}</span>
+                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{review.language || 'Code'}</span>
                     <span className="text-zinc-800 text-[10px]">•</span>
                     <div className="flex items-center gap-1 text-[10px] text-zinc-500">
                       <Clock className="size-2.5" />
-                      {new Date(review.createdAt).toLocaleDateString()}
+                      {new Date(review.createdAt || review.timestamp || Date.now()).toLocaleDateString()}
                     </div>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0 ml-4">
                 <span className={`text-sm font-bold ${
-                  review.score >= 80 ? "text-emerald-500" : 
-                  review.score >= 60 ? "text-amber-500" : "text-red-500"
+                  (review.score ?? 0) >= 80 ? "text-emerald-500" : 
+                  (review.score ?? 0) >= 60 ? "text-amber-500" : "text-red-500"
                 }`}>
-                  {review.score}
+                  {review.score ?? "-"}
                 </span>
                 <ChevronRight className="size-4 text-zinc-700 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
               </div>

@@ -72,7 +72,7 @@ export default function DashboardPage() {
               totalReviews={history?.length || 0}
               topWeakness={memory?.topWeakness || "N/A"}
               recurringCount={memory?.recurringWeaknesses?.length || 0}
-              latestDate={history && history.length > 0 ? history[0]?.createdAt || null : null}
+              latestDate={history && history.length > 0 ? (history[0]?.createdAt || history[0]?.timestamp || null) : null}
             />
           )}
         </section>
